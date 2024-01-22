@@ -1,0 +1,5 @@
+pandas
+timeit
+speech_recognition
+msvcrt
+difflib
