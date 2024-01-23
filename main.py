@@ -1,12 +1,15 @@
 import pandas as pd
 import timeit
+import shutil
 
-import speech_recognition as sr
+from aug_packages import speech_recognition as sr
 import msvcrt
 
 from difflib import SequenceMatcher
 
 SIMILARITY = 0.80
+columns = shutil.get_terminal_size().columns
+
 def similar(a, b):
     return SequenceMatcher(None, a, b).ratio()
 
@@ -18,11 +21,12 @@ def get_voice_input(voice_handler:sr.Recognizer, dev=False,target_line=None):
     while msvcrt.kbhit():
         msvcrt.getch()
     flag = input('Enter을 누르면 녹음을 시작합니다.')
-
-    print('시작하세요.')
+    
     with sr.Microphone() as source:
+        voice_handler.adjust_for_ambient_noise(source)
+        print('시작하세요.')
         audio = voice_handler.listen(source)
-    print('녹음 종료.')
+        print('녹음 종료.')
 
     try:
         start = timeit.default_timer()
@@ -31,7 +35,7 @@ def get_voice_input(voice_handler:sr.Recognizer, dev=False,target_line=None):
         stop = timeit.default_timer()
         if dev == True:
             print(f"{stop-start}s")
-        input_line = input_line.replace(' ', '').replace(',','').replace('.','')
+        input_line = input_line.replace(' ', '').replace(',','').replace('.','').replace('?','')
     except sr.UnknownValueError:
         print("Whisper could not understand audio")
     except sr.RequestError as e:
@@ -49,8 +53,9 @@ def get_console_input():
 
 def run_dev(voice_handler:sr.Recognizer, target_line:str):
     input_line = get_voice_input(voice_handler, dev=True, target_line=target_line)
-    print(f'{similar(input_line, target_line)*100//1}점이네용^^')
+    print(f'{similar(input_line, target_line)*1000//10}점이네용^^')
     print('target :', target_line)
+    
 
     wrong_count = 0
 
@@ -59,7 +64,11 @@ def run_dev(voice_handler:sr.Recognizer, target_line:str):
         print(f'땡! {wrong_count}번 틀리셨어요... ')
         print()
 
+        skip_triggers = ('건너뛰기', 'skip', '스킵')
         input_line = get_voice_input(voice_handler, dev=True, target_line=target_line)
+        if input_line in skip_triggers:
+            print('skipped')
+            break
         print(f'{similar(input_line, target_line)*100//1}점이네용^^')
 
         print('input :', input_line, '/ target :', target_line)
@@ -92,6 +101,12 @@ def run_mode_1(voice_handler:sr.Recognizer, target_line:str):
         print(f'{similar(input_line, target_line)*100//1}점이네용^^')  
 
 
+def load_script():
+    script_path = './script_csv.csv'
+    script = pd.read_csv(script_path, encoding='utf8')
+
+    return script
+
 
 def main():
     voice_handler = None
@@ -105,6 +120,7 @@ def main():
     if mode == '1':
         print('음성 인식 모듈을 로딩 중이에요.')
         voice_handler = sr.Recognizer()
+        voice_handler.energy_threshold = 1000
         print('음성 인식 모듈 준비 완료\n')
     elif mode == 'dev':
         print('Enter DEV mode.')
@@ -121,7 +137,8 @@ def main():
     start = timeit.default_timer()
     print('대본을 불러오고 있어요.')
 
-    df = pd.read_csv('./script/script_csv.csv', encoding='utf8')
+    # Modulized for path flexibility
+    script = load_script()
 
     stop = timeit.default_timer()
     print(f'대본을 불러왔어요.\n걸린시간 : {stop-start}s')
@@ -129,13 +146,19 @@ def main():
 
 
     # Load chapters
-    df_grouped = df.groupby('chapter')
+    script_grouped = script.groupby('chapter')
 
     # Select chapter to practice
-    print('막:', df['chapter'].unique())
-    target_chapter = input("(n)막 연습하기 : ")
-    print()
-    target_chapter_lines = df_grouped.get_group(target_chapter)
+    chapters = script['chapter'].unique()
+    target_chapter = ''
+    while target_chapter not in chapters:
+        try:
+            print('막:', chapters)
+            target_chapter = input("(n)막 연습하기 : ")
+            print()
+            target_chapter_lines = script_grouped.get_group(target_chapter)
+        except:
+            print('다시 시도해주세요.')
 
 
     # Load characters
@@ -145,9 +168,14 @@ def main():
         character_select_text += f'{i+1}. {characters[i]} '
     
     # Select character
-    target_character_index = input("(캐릭터) 연습하기\n숫자로 입력해주세요.\n" + character_select_text + '\n')
-    print()
-    target_character = characters[int(target_character_index)-1]
+    target_character = ''
+    while target_character not in characters:
+        try:
+            target_character_index = input("(캐릭터) 연습하기\n숫자로 입력해주세요.\n" + character_select_text + '\n')
+            print()
+            target_character = characters[int(target_character_index)-1]
+        except:
+            print('다시 시도해주세요.')
 
 
     # Run through lines
@@ -159,9 +187,9 @@ def main():
 
         # If target character
         else:
-            target_line = row['line'].replace(' ', '').replace(',','')
+            target_line = row['line'].replace(' ', '').replace(',','').replace('-','')
             if mode == '1' or 'dev':
-                target_line = target_line.replace('.','')
+                target_line = target_line.replace('.','').replace('!','').replace('?','')
 
 
 
@@ -177,6 +205,7 @@ def main():
 
             print(':)')
             
+    print('-----------The End-----------'.center(columns))
 
 
 if __name__ == "__main__":
