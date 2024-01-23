@@ -41,8 +41,8 @@ from .exceptions import (
     WaitTimeoutError,
 )
 
-__author__ = "Anthony Zhang (Uberi), ameumeu"
-__version__ = "3.10.2"
+__author__ = "Anthony Zhang (Uberi)"
+__version__ = "3.10.1"
 __license__ = "BSD"
 
 
